@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 
-//Scroll 0x6EA73e05AdC79974B931123675ea8F78FfdacDF0
-interface IScrollCustomerBridge {
+// https://scrollscan.com/address/0xe0a0509a66c509f55c85a20eb8c60676135081f7#code#F8#L47
+interface  IScrollCustomerBridge {
     function withdrawETH(
         address _to,
         uint256 _amount,
