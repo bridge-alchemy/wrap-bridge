@@ -6,12 +6,12 @@ import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol"
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
-import "../interface/IScrollCustomerBridge.sol";
-import "../interface/IPolygonZkEVMCustomerBridge.sol";
-import "../interface/IOptimismCustomerBridge.sol";
-import "../interface/WETH.sol";
-import "../interface/IPool.sol";
-import "../libraries/ContractsAddress.sol";
+import "../../../interfaces/IScrollCustomerBridge.sol";
+import "../../../interfaces/IPolygonZkEVMCustomerBridge.sol";
+import "../../../interfaces/IOptimismCustomerBridge.sol";
+import "../../../interfaces/WETH.sol";
+import "../../../interfaces/IPool.sol";
+import "../../libraries/ContractsAddress.sol";
 
 
 contract Pool is IPool, AccessControlUpgradeable,PausableUpgradeable, ReentrancyGuardUpgradeable{
