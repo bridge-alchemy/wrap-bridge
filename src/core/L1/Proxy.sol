@@ -6,8 +6,12 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 
 contract Proxy is TransparentUpgradeableProxy {
 
-
     constructor(address BridgeLogic, address admin_, bytes memory _data) TransparentUpgradeableProxy(BridgeLogic, admin_, _data) {
+
+    }
+
+
+    function StakeETH() public payable {
 
     }
 }

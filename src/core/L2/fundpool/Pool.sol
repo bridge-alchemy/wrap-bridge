@@ -5,24 +5,31 @@ pragma solidity 0.8.22;
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import "../../../interfaces/IScrollCustomerBridge.sol";
 import "../../../interfaces/IPolygonZkEVMCustomerBridge.sol";
 import "../../../interfaces/IOptimismCustomerBridge.sol";
 import "../../../interfaces/WETH.sol";
-import "../../../interfaces/IPool.sol";
+import "../../../interfaces/IL2Pool.sol";
 import "../../libraries/ContractsAddress.sol";
 
 
-contract Pool is IPool, AccessControlUpgradeable,PausableUpgradeable, ReentrancyGuardUpgradeable{
+contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, ReentrancyGuardUpgradeable{
 
-    mapping(uint chainId => bool) private IsSupportedChainId;
+    using SafeERC20 for IERC20;
+    mapping(uint  => bool) private IsSupportedChainId;
+    mapping(address => bool) private IsSupportStableCoin;
     uint public MINDepositAmount = 1e16;
     uint public perfee = 1_000; // 0.1%
-    uint public Total_value;
-    address public L1Bridge;
-    uint public constant ETHER_32 = 32 ether;
-    uint32 public constant MAX_GAS_Limit = 100_000; // 100%
+    uint public Total_ETH_value;
+    uint public Total_ETH_fee;
+    uint public Total_ETH_StableCoin;
+    uint public Total_ETH_StableCoin_fee;
+    uint32 public constant MAX_GAS_Limit = 100_000; // 0.1%
+
+
     bytes32 public constant PAUSE_ROLE = keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 public constant MINDepositAmount_ROLE = keccak256(abi.encode(uint256(keccak256("MINDepositAmount_ROLE")) - 1)) & ~bytes32(uint256(0xff));
     bytes32 public constant WithdrawToBridge_Role = keccak256(abi.encode(uint256(keccak256("WithdrawToBridge_Role")) - 1)) & ~bytes32(uint256(0xff));
@@ -32,28 +39,33 @@ contract Pool is IPool, AccessControlUpgradeable,PausableUpgradeable, Reentrancy
         _disableInitializers();
     }
 
-    function initialize(address _MultisigWallet, address _L1Bridge) public initializer {
-        __AccessControl_init();
-        __Pausable_init();
-        grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
-        L1Bridge = _L1Bridge;
+    fallback() external payable {
 
     }
 
-    function deposit(uint chainId, address to) external  payable override returns(bool){
+    receive() external payable {
+
+    }
+
+    function initialize(address _MultisigWallet) public initializer {
+        __AccessControl_init();
+        __Pausable_init();
+        grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
+
+    }
+
+    function depositETH(uint chainId, address to) external  payable override returns(bool){
         if(!IsSupportChainId(chainId)) {
             revert ChainIdIsNotSupported(chainId);
         }
         if(msg.value < MINDepositAmount){
             revert LessThanMINDepositAmount(MINDepositAmount,msg.value);
         }
-        Total_value += msg.value;
+        Total_ETH_value += msg.value;
 
-        if(address(this).balance > ETHER_32){
-            emit CanWithdraw32ETH();
-        }
         uint fee = msg.value * perfee / 1_000_000;
         uint amount = msg.value - fee;
+        Total_ETH_fee += fee;
         emit  DepositETH(chainId, msg.sender, to, amount);
         return true;
     }
@@ -107,9 +119,41 @@ contract Pool is IPool, AccessControlUpgradeable,PausableUpgradeable, Reentrancy
             revert LessThanMINDepositAmount(MINDepositAmount,amount);
         }
         WETH.withdraw(BalanceAfter);
-        Total_value += amount;
+        Total_ETH_value += amount;
+        uint fee = amount * perfee / 1_000_000;
+        amount -= fee;
+        Total_ETH_fee += fee;
         emit DepositWETH(chainId, msg.sender, to, amount);
 
+        return true;
+    }
+
+
+    function depositStableERC20(uint chainId, address to, address ERC20Address, uint256 value)  external override returns(bool){
+        if(!IsSupportChainId(chainId)) {
+            revert ChainIdNotSupported(chainId);
+        }
+        if (IsSupportStableCoin(ERC20Address)){
+            revert StableCoinNotSupported(ERC20Address);
+        }
+
+        uint BalanceBefore = IERC20(ERC20Address).balanceOf(address(this));
+        IERC20(ERC20Address).safeTransferFrom(msg.sender, address(this), value);
+        uint BalanceAfter = IERC20(ERC20Address).balanceOf(address(this));
+        uint amount = BalanceAfter - BalanceBefore;
+        Total_ETH_StableCoin += amount;
+        uint fee = amount * perfee / 1_000_000;
+        amount -= fee;
+        Total_ETH_StableCoin_fee += fee;
+
+        emit  DepositERC20(chainId, ERC20Address, msg.sender, to,  amount);
+
+        return true;
+    }
+
+    function WithdrawStableCointoOfficialBridge() onlyRole(WithdrawToBridge_Role) external payable returns(bool) {
+
+        //TODO
         return true;
     }
 
@@ -120,30 +164,27 @@ contract Pool is IPool, AccessControlUpgradeable,PausableUpgradeable, Reentrancy
     /* admin functions */
 
 
-    function deposit32ETHtoCoustomerBridge() onlyRole(WithdrawToBridge_Role) external payable returns(bool){
-        if(address(this).balance < ETHER_32){
-            revert NotEnoughETH();
-        }
-
+    function WithdrawETHtoOfficialBridge(address to) onlyRole(WithdrawToBridge_Role) external payable returns(bool){
 
         uint Blockchain = block.chainid;
+        uint balance = address(this).balance;
 
         if (Blockchain == 0x82750) {
             //https://chainlist.org/chain/534352
             //Scroll
-            IScrollCustomerBridge(ContractsAddress.ScrollCustomerBridge).withdrawETH{value: ETHER_32}(L1Bridge, ETHER_32, uint256(MAX_GAS_Limit));
+            IScrollCustomerBridge(ContractsAddress.ScrollCustomerBridge).withdrawETH{value: balance}(to, balance, uint256(MAX_GAS_Limit));
 
         }else if(Blockchain == 0x44d){
             //https://chainlist.org/chain/1101
             //Polygon zkEVM
-            IPolygonZkEVMCustomerBridge(ContractsAddress.PolygonCustomerBridge).bridgeAsset(0, L1Bridge, ETHER_32, address(0), false, "");
+            IPolygonZkEVMCustomerBridge(ContractsAddress.PolygonCustomerBridge).bridgeAsset{value: balance}(0, to, balance, address(0), false, "");
 
 
 
         }else if(Blockchain == 0xa){
             //https://chainlist.org/chain/10
             //OP Mainnet
-            IOptimismCustomerBridge(ContractsAddress.OptimismCustomerBridge).withdrawTo(ContractsAddress.OP_LEGACY_ERC20_ETH, L1Bridge,  ETHER_32, MAX_GAS_Limit, "");
+            IOptimismCustomerBridge(ContractsAddress.OptimismCustomerBridge).withdrawTo{value: balance}(ContractsAddress.OP_LEGACY_ERC20_ETH, to,  balance, MAX_GAS_Limit, "");
 
 
         }else if(Blockchain == 0xa4b1){
@@ -161,14 +202,19 @@ contract Pool is IPool, AccessControlUpgradeable,PausableUpgradeable, Reentrancy
             revert ErrorBlockChain();
         }
 
+        Total_ETH_fee = 0;
 
-
-        emit Withdraw32ETHtoCoustomerBridge(block.chainid,  block.timestamp, L1Bridge,  32 ether);
+        emit WithdrawETHtoOfficialBridge(block.chainid,  block.timestamp, to,  balance, Total_ETH_fee);
         return true;
     }
 
+
     function setValidChainId(uint chainId, bool isValid) onlyRole(DEFAULT_ADMIN_ROLE) external {
         IsSupportedChainId[chainId] = isValid;
+    }
+
+    function setSupportStableCoin(address ERC20Address, bool isValid) onlyRole(DEFAULT_ADMIN_ROLE) external {
+        IsSupportStableCoin[ERC20Address] = isValid;
     }
 
 
