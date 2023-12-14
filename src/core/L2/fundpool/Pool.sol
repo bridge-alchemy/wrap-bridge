@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.22;
 
-
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -15,11 +14,14 @@ import "../../../interfaces/WETH.sol";
 import "../../../interfaces/IL2Pool.sol";
 import "../../libraries/ContractsAddress.sol";
 
-
-contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, ReentrancyGuardUpgradeable{
-
+contract L2Pool is
+    IL2Pool,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using SafeERC20 for IERC20;
-    mapping(uint  => bool) private IsSupportedChainId;
+    mapping(uint => bool) private IsSupportedChainId;
     mapping(address => bool) private IsSupportStableCoin;
     uint public MINDepositAmount = 1e16;
     uint public perfee = 1_000; // 0.1%
@@ -29,49 +31,55 @@ contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, Reentr
     uint public Total_ETH_StableCoin_fee;
     uint32 public constant MAX_GAS_Limit = 100_000; // 0.1%
 
+    bytes32 public constant PAUSE_ROLE =
+        keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) &
+            ~bytes32(uint256(0xff));
+    bytes32 public constant MINDepositAmount_ROLE =
+        keccak256(abi.encode(uint256(keccak256("MINDepositAmount_ROLE")) - 1)) &
+            ~bytes32(uint256(0xff));
+    bytes32 public constant WithdrawToBridge_Role =
+        keccak256(abi.encode(uint256(keccak256("WithdrawToBridge_Role")) - 1)) &
+            ~bytes32(uint256(0xff));
 
-    bytes32 public constant PAUSE_ROLE = keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 public constant MINDepositAmount_ROLE = keccak256(abi.encode(uint256(keccak256("MINDepositAmount_ROLE")) - 1)) & ~bytes32(uint256(0xff));
-    bytes32 public constant WithdrawToBridge_Role = keccak256(abi.encode(uint256(keccak256("WithdrawToBridge_Role")) - 1)) & ~bytes32(uint256(0xff));
-
-
-    constructor(){
+    constructor() {
         _disableInitializers();
     }
 
-    fallback() external payable {
+    fallback() external payable {}
 
-    }
-
-    receive() external payable {
-
-    }
+    receive() external payable {}
 
     function initialize(address _MultisigWallet) public initializer {
         __AccessControl_init();
         __Pausable_init();
         grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
-
     }
 
-    function depositETH(uint chainId, address to) external  payable override returns(bool){
-        if(!IsSupportChainId(chainId)) {
+    function depositETH(
+        uint chainId,
+        address to
+    ) external payable override returns (bool) {
+        if (!IsSupportChainId(chainId)) {
             revert ChainIdIsNotSupported(chainId);
         }
-        if(msg.value < MINDepositAmount){
-            revert LessThanMINDepositAmount(MINDepositAmount,msg.value);
+        if (msg.value < MINDepositAmount) {
+            revert LessThanMINDepositAmount(MINDepositAmount, msg.value);
         }
         Total_ETH_value += msg.value;
 
-        uint fee = msg.value * perfee / 1_000_000;
+        uint fee = (msg.value * perfee) / 1_000_000;
         uint amount = msg.value - fee;
         Total_ETH_fee += fee;
-        emit  DepositETH(chainId, msg.sender, to, amount);
+        emit DepositETH(chainId, msg.sender, to, amount);
         return true;
     }
 
-    function depositWETH(uint chainId, address to, uint256 value)  external override returns(bool){
-        if(!IsSupportChainId(chainId)) {
+    function depositWETH(
+        uint chainId,
+        address to,
+        uint256 value
+    ) external override returns (bool) {
+        if (!IsSupportChainId(chainId)) {
             revert ChainIdNotSupported(chainId);
         }
 
@@ -80,33 +88,23 @@ contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, Reentr
         if (Blockchain == 0x82750) {
             //https://chainlist.org/chain/534352
             //Scroll
-            WETH  = IWETH(ContractsAddress.ScrollWETH);
-
-
-        } else if(Blockchain == 0x44d){
+            WETH = IWETH(ContractsAddress.ScrollWETH);
+        } else if (Blockchain == 0x44d) {
             //https://chainlist.org/chain/1101
             //Polygon zkEVM
-            WETH  = IWETH(ContractsAddress.PolygonWETH);
-
-
-        } else if(Blockchain == 0xa){
+            WETH = IWETH(ContractsAddress.PolygonWETH);
+        } else if (Blockchain == 0xa) {
             //https://chainlist.org/chain/10
             //OP Mainnet
-            WETH  = IWETH(ContractsAddress.OptimismWETH);
-
-
-        } else if(Blockchain == 0xa4b1){
+            WETH = IWETH(ContractsAddress.OptimismWETH);
+        } else if (Blockchain == 0xa4b1) {
             //https://chainlist.org/chain/42161
             //Arbitrum
-            WETH  = IWETH(ContractsAddress.ArbitrumWETH);
-
-
-        } else if(Blockchain == 0xe708){
+            WETH = IWETH(ContractsAddress.ArbitrumWETH);
+        } else if (Blockchain == 0xe708) {
             //https://chainlist.org/chain/59144
             //Linea
-            WETH  = IWETH(ContractsAddress.LineaWETH);
-
-
+            WETH = IWETH(ContractsAddress.LineaWETH);
         } else {
             revert ErrorBlockChain();
         }
@@ -115,12 +113,12 @@ contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, Reentr
         WETH.transferFrom(msg.sender, address(this), value);
         uint BalanceAfter = WETH.balanceOf(address(this));
         uint amount = BalanceAfter - BalanceBefore;
-        if(amount < MINDepositAmount){
-            revert LessThanMINDepositAmount(MINDepositAmount,amount);
+        if (amount < MINDepositAmount) {
+            revert LessThanMINDepositAmount(MINDepositAmount, amount);
         }
         WETH.withdraw(BalanceAfter);
         Total_ETH_value += amount;
-        uint fee = amount * perfee / 1_000_000;
+        uint fee = (amount * perfee) / 1_000_000;
         amount -= fee;
         Total_ETH_fee += fee;
         emit DepositWETH(chainId, msg.sender, to, amount);
@@ -128,12 +126,16 @@ contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, Reentr
         return true;
     }
 
-
-    function depositStableERC20(uint chainId, address to, address ERC20Address, uint256 value)  external override returns(bool){
-        if(!IsSupportChainId(chainId)) {
+    function depositStableERC20(
+        uint chainId,
+        address to,
+        address ERC20Address,
+        uint256 value
+    ) external override returns (bool) {
+        if (!IsSupportChainId(chainId)) {
             revert ChainIdNotSupported(chainId);
         }
-        if (IsSupportStableCoin(ERC20Address)){
+        if (IsSupportStableCoin(ERC20Address)) {
             revert StableCoinNotSupported(ERC20Address);
         }
 
@@ -142,86 +144,110 @@ contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, Reentr
         uint BalanceAfter = IERC20(ERC20Address).balanceOf(address(this));
         uint amount = BalanceAfter - BalanceBefore;
         Total_ETH_StableCoin += amount;
-        uint fee = amount * perfee / 1_000_000;
+        uint fee = (amount * perfee) / 1_000_000;
         amount -= fee;
         Total_ETH_StableCoin_fee += fee;
 
-        emit  DepositERC20(chainId, ERC20Address, msg.sender, to,  amount);
+        emit DepositERC20(chainId, ERC20Address, msg.sender, to, amount);
 
         return true;
     }
 
-    function WithdrawStableCointoOfficialBridge() onlyRole(WithdrawToBridge_Role) external payable returns(bool) {
-
+    function WithdrawStableCointoOfficialBridge()
+        external
+        payable
+        onlyRole(WithdrawToBridge_Role)
+        returns (bool)
+    {
         //TODO
         return true;
     }
 
-    function IsSupportChainId(uint chainId) public view returns(bool){
+    function IsSupportChainId(uint chainId) public view returns (bool) {
         return IsSupportedChainId[chainId];
     }
 
     /* admin functions */
 
-
-    function WithdrawETHtoOfficialBridge(address to) onlyRole(WithdrawToBridge_Role) external payable returns(bool){
-
+    function WithdrawETHtoOfficialBridge(
+        address to
+    ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
         uint Blockchain = block.chainid;
         uint balance = address(this).balance;
 
         if (Blockchain == 0x82750) {
             //https://chainlist.org/chain/534352
             //Scroll
-            IScrollCustomerBridge(ContractsAddress.ScrollCustomerBridge).withdrawETH{value: balance}(to, balance, uint256(MAX_GAS_Limit));
-
-        }else if(Blockchain == 0x44d){
+            IScrollCustomerBridge(ContractsAddress.ScrollCustomerBridge)
+                .withdrawETH{value: balance}(
+                to,
+                balance,
+                uint256(MAX_GAS_Limit)
+            );
+        } else if (Blockchain == 0x44d) {
             //https://chainlist.org/chain/1101
             //Polygon zkEVM
-            IPolygonZkEVMCustomerBridge(ContractsAddress.PolygonCustomerBridge).bridgeAsset{value: balance}(0, to, balance, address(0), false, "");
-
-
-
-        }else if(Blockchain == 0xa){
+            IPolygonZkEVMCustomerBridge(ContractsAddress.PolygonCustomerBridge)
+                .bridgeAsset{value: balance}(
+                0,
+                to,
+                balance,
+                address(0),
+                false,
+                ""
+            );
+        } else if (Blockchain == 0xa) {
             //https://chainlist.org/chain/10
             //OP Mainnet
-            IOptimismCustomerBridge(ContractsAddress.OptimismCustomerBridge).withdrawTo{value: balance}(ContractsAddress.OP_LEGACY_ERC20_ETH, to,  balance, MAX_GAS_Limit, "");
-
-
-        }else if(Blockchain == 0xa4b1){
+            IOptimismCustomerBridge(ContractsAddress.OptimismCustomerBridge)
+                .withdrawTo{value: balance}(
+                ContractsAddress.OP_LEGACY_ERC20_ETH,
+                to,
+                balance,
+                MAX_GAS_Limit,
+                ""
+            );
+        } else if (Blockchain == 0xa4b1) {
             //https://chainlist.org/chain/42161
             //Arbitrum
             //TODO
-
-        }else if(Blockchain == 0xe708){
+        } else if (Blockchain == 0xe708) {
             //https://chainlist.org/chain/59144
             //Linea
             //TODO
-
-
-        }else{
+        } else {
             revert ErrorBlockChain();
         }
 
         Total_ETH_fee = 0;
 
-        emit WithdrawETHtoOfficialBridge(block.chainid,  block.timestamp, to,  balance, Total_ETH_fee);
+        emit WithdrawETHtoOfficialBridge(
+            block.chainid,
+            block.timestamp,
+            to,
+            balance,
+            Total_ETH_fee
+        );
         return true;
     }
 
-
-    function setValidChainId(uint chainId, bool isValid) onlyRole(DEFAULT_ADMIN_ROLE) external {
+    function setValidChainId(
+        uint chainId,
+        bool isValid
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IsSupportedChainId[chainId] = isValid;
     }
 
-    function setSupportStableCoin(address ERC20Address, bool isValid) onlyRole(DEFAULT_ADMIN_ROLE) external {
+    function setSupportStableCoin(
+        address ERC20Address,
+        bool isValid
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IsSupportStableCoin[ERC20Address] = isValid;
     }
 
-
-    function setPerfee(uint _perfee) onlyRole(DEFAULT_ADMIN_ROLE) external {
+    function setPerfee(uint _perfee) external onlyRole(DEFAULT_ADMIN_ROLE) {
         perfee = _perfee;
     }
-
 
     function pause() external onlyRole(PAUSE_ROLE) {
         _pause();
@@ -231,9 +257,9 @@ contract L2Pool is IL2Pool, AccessControlUpgradeable,PausableUpgradeable, Reentr
         _unpause();
     }
 
-    function setMINDepositAmount(uint _MINDepositAmount) external onlyRole(MINDepositAmount_ROLE) {
-        MINDepositAmount =  _MINDepositAmount;
+    function setMINDepositAmount(
+        uint _MINDepositAmount
+    ) external onlyRole(MINDepositAmount_ROLE) {
+        MINDepositAmount = _MINDepositAmount;
     }
-
-
 }
