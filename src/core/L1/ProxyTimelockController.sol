@@ -13,8 +13,10 @@ contract ProxyTimelockController is TimelockController {
      * @param proposers The proposers for timelock controller
      * @param executors The executors for timelock controller
      */
-    constructor(uint256 minDelay, address[] memory proposers, address[] memory executors, address admin) TimelockController(minDelay, proposers, executors, admin) {
-
-    }
-
+    constructor(
+        uint256 minDelay,
+        address[] memory proposers,
+        address[] memory executors,
+        address admin
+    ) TimelockController(minDelay, proposers, executors, admin) {}
 }
