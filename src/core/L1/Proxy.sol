@@ -9,6 +9,4 @@ contract Proxy is TransparentUpgradeableProxy {
         address admin_,
         bytes memory _data
     ) TransparentUpgradeableProxy(BridgeLogic, admin_, _data) {}
-
-    function StakeETH() public payable {}
 }

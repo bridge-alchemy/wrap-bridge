@@ -21,14 +21,14 @@ contract L2Pool is
     ReentrancyGuardUpgradeable
 {
     using SafeERC20 for IERC20;
-    mapping(uint => bool) private IsSupportedChainId;
-    mapping(address => bool) private IsSupportStableCoin;
-    uint public MINDepositAmount = 1e16;
-    uint public perfee = 1_000; // 0.1%
-    uint public Total_ETH_value;
-    uint public Total_ETH_fee;
-    uint public Total_ETH_StableCoin;
-    uint public Total_ETH_StableCoin_fee;
+    mapping(uint256 => bool) private IsSupportedChainId;
+    mapping(address => bool) private IsSupportedStableCoin;
+    uint256 public MINDepositAmount = 1e16;
+    uint256 public perfee = 1_000; // 0.1%
+    uint256 public Total_ETH_value;
+    uint256 public Total_ETH_fee;
+    uint256 public Total_ETH_StableCoin;
+    uint256 public Total_ETH_StableCoin_fee;
     uint32 public constant MAX_GAS_Limit = 100_000; // 0.1%
 
     bytes32 public constant PAUSE_ROLE =
@@ -56,7 +56,7 @@ contract L2Pool is
     }
 
     function depositETH(
-        uint chainId,
+        uint256 chainId,
         address to
     ) external payable override returns (bool) {
         if (!IsSupportChainId(chainId)) {
@@ -67,15 +67,15 @@ contract L2Pool is
         }
         Total_ETH_value += msg.value;
 
-        uint fee = (msg.value * perfee) / 1_000_000;
-        uint amount = msg.value - fee;
+        uint256 fee = (msg.value * perfee) / 1_000_000;
+        uint256 amount = msg.value - fee;
         Total_ETH_fee += fee;
         emit DepositETH(chainId, msg.sender, to, amount);
         return true;
     }
 
     function depositWETH(
-        uint chainId,
+        uint256 chainId,
         address to,
         uint256 value
     ) external override returns (bool) {
@@ -83,7 +83,7 @@ contract L2Pool is
             revert ChainIdNotSupported(chainId);
         }
 
-        uint Blockchain = block.chainid;
+        uint256 Blockchain = block.chainid;
         IWETH WETH;
         if (Blockchain == 0x82750) {
             //https://chainlist.org/chain/534352
@@ -109,16 +109,16 @@ contract L2Pool is
             revert ErrorBlockChain();
         }
 
-        uint BalanceBefore = WETH.balanceOf(address(this));
+        uint256 BalanceBefore = WETH.balanceOf(address(this));
         WETH.transferFrom(msg.sender, address(this), value);
-        uint BalanceAfter = WETH.balanceOf(address(this));
-        uint amount = BalanceAfter - BalanceBefore;
+        uint256 BalanceAfter = WETH.balanceOf(address(this));
+        uint256 amount = BalanceAfter - BalanceBefore;
         if (amount < MINDepositAmount) {
             revert LessThanMINDepositAmount(MINDepositAmount, amount);
         }
         WETH.withdraw(BalanceAfter);
         Total_ETH_value += amount;
-        uint fee = (amount * perfee) / 1_000_000;
+        uint256 fee = (amount * perfee) / 1_000_000;
         amount -= fee;
         Total_ETH_fee += fee;
         emit DepositWETH(chainId, msg.sender, to, amount);
@@ -127,7 +127,7 @@ contract L2Pool is
     }
 
     function depositStableERC20(
-        uint chainId,
+        uint256 chainId,
         address to,
         address ERC20Address,
         uint256 value
@@ -135,16 +135,16 @@ contract L2Pool is
         if (!IsSupportChainId(chainId)) {
             revert ChainIdNotSupported(chainId);
         }
-        if (IsSupportStableCoin(ERC20Address)) {
+        if (!IsSupportStableCoin(ERC20Address)) {
             revert StableCoinNotSupported(ERC20Address);
         }
 
-        uint BalanceBefore = IERC20(ERC20Address).balanceOf(address(this));
+        uint256 BalanceBefore = IERC20(ERC20Address).balanceOf(address(this));
         IERC20(ERC20Address).safeTransferFrom(msg.sender, address(this), value);
-        uint BalanceAfter = IERC20(ERC20Address).balanceOf(address(this));
-        uint amount = BalanceAfter - BalanceBefore;
+        uint256 BalanceAfter = IERC20(ERC20Address).balanceOf(address(this));
+        uint256 amount = BalanceAfter - BalanceBefore;
         Total_ETH_StableCoin += amount;
-        uint fee = (amount * perfee) / 1_000_000;
+        uint256 fee = (amount * perfee) / 1_000_000;
         amount -= fee;
         Total_ETH_StableCoin_fee += fee;
 
@@ -153,18 +153,21 @@ contract L2Pool is
         return true;
     }
 
-    function WithdrawStableCointoOfficialBridge()
-        external
-        payable
-        onlyRole(WithdrawToBridge_Role)
-        returns (bool)
-    {
+    function WithdrawStableCoinToOfficialBridge(
+        address to
+    ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
         //TODO
         return true;
     }
 
-    function IsSupportChainId(uint chainId) public view returns (bool) {
+    function IsSupportChainId(uint256 chainId) public view returns (bool) {
         return IsSupportedChainId[chainId];
+    }
+
+    function IsSupportStableCoin(
+        address ERC20Address
+    ) public view returns (bool) {
+        return IsSupportedStableCoin[ERC20Address];
     }
 
     /* admin functions */
@@ -172,13 +175,13 @@ contract L2Pool is
     function WithdrawETHtoOfficialBridge(
         address to
     ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
-        uint Blockchain = block.chainid;
-        uint balance = address(this).balance;
+        uint256 Blockchain = block.chainid;
+        uint256 balance = address(this).balance;
 
         if (Blockchain == 0x82750) {
             //https://chainlist.org/chain/534352
             //Scroll
-            IScrollCustomerBridge(ContractsAddress.ScrollCustomerBridge)
+            IScrollCustomerL2Bridge(ContractsAddress.ScrollL2CustomerBridge)
                 .withdrawETH{value: balance}(
                 to,
                 balance,
@@ -187,8 +190,9 @@ contract L2Pool is
         } else if (Blockchain == 0x44d) {
             //https://chainlist.org/chain/1101
             //Polygon zkEVM
-            IPolygonZkEVMCustomerBridge(ContractsAddress.PolygonCustomerBridge)
-                .bridgeAsset{value: balance}(
+            IPolygonZkEVML2CustomerBridge(
+                ContractsAddress.PolygonL2CustomerBridge
+            ).bridgeAsset{value: balance}(
                 0,
                 to,
                 balance,
@@ -199,7 +203,7 @@ contract L2Pool is
         } else if (Blockchain == 0xa) {
             //https://chainlist.org/chain/10
             //OP Mainnet
-            IOptimismCustomerBridge(ContractsAddress.OptimismCustomerBridge)
+            IOptimismL2CustomerBridge(ContractsAddress.OptimismL2CustomerBridge)
                 .withdrawTo{value: balance}(
                 ContractsAddress.OP_LEGACY_ERC20_ETH,
                 to,
@@ -221,7 +225,7 @@ contract L2Pool is
 
         Total_ETH_fee = 0;
 
-        emit WithdrawETHtoOfficialBridge(
+        emit WithdrawETHtoOfficialBridgeSuccess(
             block.chainid,
             block.timestamp,
             to,
@@ -232,7 +236,7 @@ contract L2Pool is
     }
 
     function setValidChainId(
-        uint chainId,
+        uint256 chainId,
         bool isValid
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         IsSupportedChainId[chainId] = isValid;
@@ -242,10 +246,10 @@ contract L2Pool is
         address ERC20Address,
         bool isValid
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        IsSupportStableCoin[ERC20Address] = isValid;
+        IsSupportedStableCoin[ERC20Address] = isValid;
     }
 
-    function setPerfee(uint _perfee) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setPerfee(uint256 _perfee) external onlyRole(DEFAULT_ADMIN_ROLE) {
         perfee = _perfee;
     }
 
@@ -258,7 +262,7 @@ contract L2Pool is
     }
 
     function setMINDepositAmount(
-        uint _MINDepositAmount
+        uint256 _MINDepositAmount
     ) external onlyRole(MINDepositAmount_ROLE) {
         MINDepositAmount = _MINDepositAmount;
     }
