@@ -20,7 +20,6 @@ interface IL1Pool {
         uint256 EndPoolId;
         uint256 Amount;
     }
-
     function StarkingERC20(address _token, uint256 _amount) external;
     function StakingETH() external payable;
     function StakingWETH(uint256 amount) external;

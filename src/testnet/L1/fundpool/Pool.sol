@@ -26,7 +26,7 @@ contract L1Pool is
     address public constant ETHAddress =
         address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     address public constant WETHAddress =
-        address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+        address(0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9);
     bytes32 public constant CompletePools_ROLE =
         keccak256(abi.encode(uint256(keccak256("CompletePools_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
@@ -93,7 +93,7 @@ contract L1Pool is
         }
         uint256 PoolIndex = Pools[address(ETHAddress)].length - 1;
         if (
-            Pools[address(ETHAddress)][PoolIndex].startTimestamp >
+            Pools[address(ETHAddress)][PoolIndex].startTimestamp <
             block.timestamp
         ) {
             Users[msg.sender].push(
@@ -127,7 +127,7 @@ contract L1Pool is
             revert PoolIsCompleted(PoolIndex);
         }
         if (
-            Pools[address(WETHAddress)][PoolIndex].startTimestamp >
+            Pools[address(WETHAddress)][PoolIndex].startTimestamp <
             block.timestamp
         ) {
             Users[msg.sender].push(
@@ -140,6 +140,8 @@ contract L1Pool is
                 })
             );
             Pools[address(WETHAddress)][PoolIndex].TotalAmount += amount;
+        }else {
+            revert NewPoolIsNotCreate(PoolIndex);
         }
 
         emit StakingWETHEvent(msg.sender, amount);
@@ -227,28 +229,28 @@ contract L1Pool is
         uint256 _amount
     ) external onlyRole(Bridge_ADMIN_ROLE) {
         //        Bridge _bridge;
-        if (Blockchain == 0x82750) {
-            //https://chainlist.org/chain/534352
-            //Scroll
+        if (Blockchain == 534351) {
+            //https://chainlist.org/chain/534351
+            //Scroll testnet
             TransferAssertToScrollBridge(_token, to, _amount);
-        } else if (Blockchain == 0x44d) {
+        } else if (Blockchain == 1442) {
             //https://chainlist.org/chain/1101
-            //Polygon zkEVM
+            //Polygon zkEVM testnet
             TransferAssertToPolygonZkevmBridge(_token, to, _amount);
-        } else if (Blockchain == 0xa) {
-            //https://chainlist.org/chain/10
-            //OP Mainnet
+        } else if (Blockchain == 11155420) {
+            //https://chainlist.org/chain/11155420
+            //OP Mainnet testnet
             TransferAssertToOptimismBridge(_token, to, _amount);
-        } else if (Blockchain == 0xa4b1) {
-            //https://chainlist.org/chain/42161
-            //Arbitrum
-            //Todo
-            //            TransferAssertToArbitrumBridge(_token, to, _amount);
-        } else if (Blockchain == 0xe708) {
-            //https://chainlist.org/chain/59144
-            //Linea
-            //Todo
-            //            TransferAssertToLineaBridge(_token, to, _amount);
+//        } else if (Blockchain == 0xa4b1) {
+//            //https://chainlist.org/chain/42161
+//            //Arbitrum
+//            //Todo
+//            //            TransferAssertToArbitrumBridge(_token, to, _amount);
+//        } else if (Blockchain == 0xe708) {
+//            //https://chainlist.org/chain/59144
+//            //Linea
+//            //Todo
+//            //            TransferAssertToLineaBridge(_token, to, _amount);
         } else {
             revert ErrorBlockChain();
         }

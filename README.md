@@ -24,6 +24,7 @@ $ forge build
 ### Test
 
 ```shell
+$ source .env
 $ forge test
 ```
 

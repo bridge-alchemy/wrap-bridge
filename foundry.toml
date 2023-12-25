@@ -5,3 +5,11 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
+
+[rpc_endpoints]
+scroll = "https://rpc.ankr.com/scroll_sepolia_testnet/${ANKR_KEY}"
+sepolia = "https://rpc.ankr.com/eth_sepolia/${ANKR_KEY}"
+polygon-zkevm = "https://rpc.ankr.com/polygon_zkevm_testnet/${ANKR_KEY}"
+op-sepolia = "https://rpc.ankr.com/optimism_sepolia/${ANKR_KEY}"
+
+#  op-sepolia -> sepolia -> scroll

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/governance/TimelockController.sol";
  * @title PoolManager
  * @dev PoolManager is a contract for managing the pool
  */
-contract ProxyTimelockController is TimelockController {
+contract ProxyTimeLockController is TimelockController {
     /**
      * @dev constructor
      * @param minDelay The minimum delay for timelock controller
