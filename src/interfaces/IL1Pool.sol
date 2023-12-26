@@ -25,7 +25,7 @@ interface IL1Pool {
     function StakingWETH(uint256 amount) external;
     function ClaimAll() external;
     function ClaimSimpleAsset(address _token) external;
-    function CompletePoolAndNew(Pool[] memory CompletePools) external;
+    function CompletePoolAndNew(Pool[] memory CompletePools)  external payable;
     function setMinStakeAmount(address _token, uint256 _amount) external;
     function SetSupportToken(address _token, bool _isSupport, uint32 startTimes) external;
     function TransferAssertToBridge(uint256 Blockchain,address _token, address _to, uint256 _amount) external;
@@ -38,6 +38,7 @@ interface IL1Pool {
     event SetMinStakeAmountEvent(address indexed token, uint256 amount);
     event SetSupportTokenEvent(address indexed token, bool isSupport);
 
+    error NoReward();
     error ErrorBlockChain();
     error TokenIsNotSupported(address token);
     error NewPoolIsNotCreate(uint256 PoolIndex);

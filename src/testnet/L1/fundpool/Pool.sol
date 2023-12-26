@@ -14,6 +14,7 @@ import "../../../interfaces/IPolygonZkEVMCustomerBridge.sol";
 import "../../../interfaces/IOptimismCustomerBridge.sol";
 import "../../../interfaces/IArbitrumCustomerBridge.sol";
 import "../../libraries/ContractsAddress.sol";
+import "forge-std/Test.sol";
 
 contract L1Pool is
     IL1Pool,
@@ -33,10 +34,9 @@ contract L1Pool is
     bytes32 public constant Bridge_ADMIN_ROLE =
         keccak256(abi.encode(uint256(keccak256("Bridge_ADMIN_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
-    uint32 public periodTime = 3 * 1 days;
+    uint32 public periodTime;
 
     mapping(address => bool) public IsSupportToken;
-    mapping(address => uint256) public balances;
     mapping(address => Pool[]) public Pools;
     mapping(address => User[]) public Users;
     mapping(address => uint256) public MinStakeAmount;
@@ -51,6 +51,7 @@ contract L1Pool is
         __AccessControl_init();
         __Pausable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
+        periodTime = 3 days;
 
 
     }
@@ -79,7 +80,10 @@ contract L1Pool is
                 })
             );
             Pools[_token][PoolIndex].TotalAmount += _amount;
+        }else {
+            revert NewPoolIsNotCreate(PoolIndex);
         }
+
 
         emit StarkingERC20Event(msg.sender, _token, _amount);
     }
@@ -93,7 +97,7 @@ contract L1Pool is
         }
         uint256 PoolIndex = Pools[address(ETHAddress)].length - 1;
         if (
-            Pools[address(ETHAddress)][PoolIndex].startTimestamp <
+            Pools[address(ETHAddress)][PoolIndex].startTimestamp >
             block.timestamp
         ) {
             Users[msg.sender].push(
@@ -127,7 +131,7 @@ contract L1Pool is
             revert PoolIsCompleted(PoolIndex);
         }
         if (
-            Pools[address(WETHAddress)][PoolIndex].startTimestamp <
+            Pools[address(WETHAddress)][PoolIndex].startTimestamp >
             block.timestamp
         ) {
             Users[msg.sender].push(
@@ -159,31 +163,40 @@ contract L1Pool is
         if (!IsSupportToken[_token]) {
             revert TokenIsNotSupported(_token);
         }
-        uint256 length = Users[msg.sender].length;
-        for (uint256 i = 0; i < length; i++) {
+
+        for (uint256 i = 0; i < Users[msg.sender].length; i++) {
+            if(Users[msg.sender].length == 0){
+                break;
+            }
             if (Users[msg.sender][i].token != _token) {
                 continue;
             }
             if (Users[msg.sender][i].isClaimed) {
                 revert AlreadyClaimed();
             } //Last Completed PoolIndex
-            uint256 EndPoolId = Pools[_token].length - 2;
-            if (!Pools[_token][EndPoolId].IsCompleted) {
-                EndPoolId -= 1;
-            }
-            Pools[_token][EndPoolId+1].TotalAmount -= Users[msg.sender][i].Amount;
+            uint256 EndPoolId = Pools[_token].length - 1;
+            Pools[_token][EndPoolId].TotalAmount -= Users[msg.sender][i].Amount;
 
             uint256 Reward = 0;
             uint256 Amount = Users[msg.sender][i].Amount;
             uint256 startPoolId = Users[msg.sender][i].StartPoolId;
-            for (uint256 j = startPoolId; j <= EndPoolId; i++) {
+            if (startPoolId > EndPoolId) {
+                revert NoReward();
+            }
+
+            for (uint256 j = startPoolId; j < EndPoolId; i++) {
+                if (j > Pools[_token].length - 1) {
+                    revert NewPoolIsNotCreate(j);
+                }
                 uint256 _Reward = (Amount * Pools[_token][j].TotalFee) /
                     Pools[_token][j].TotalAmount;
                 Reward += _Reward;
                 Pools[_token][j].TotalFeeClaimed += _Reward;
             }
+            require(Reward > 0, "No Reward");
             Amount += Reward;
             Users[msg.sender][i].isClaimed = true;
+
             if (_token == address(ETHAddress)) {
                 payable(msg.sender).transfer(Amount);
             } else if (_token == address(WETHAddress)) {
@@ -191,8 +204,11 @@ contract L1Pool is
             } else {
                 IERC20(_token).safeTransfer(msg.sender, Amount);
             }
+
             emit ClaimEvent(msg.sender, startPoolId, EndPoolId, _token, Amount);
-            Users[msg.sender][i] = Users[msg.sender][length - 1];
+            if(Users[msg.sender].length > 1){
+                Users[msg.sender][i] = Users[msg.sender][Users[msg.sender].length - 1];
+            }
             Users[msg.sender].pop();
             i--;
         }
@@ -200,7 +216,7 @@ contract L1Pool is
 
     function CompletePoolAndNew(
         Pool[] memory CompletePools
-    ) external onlyRole(CompletePools_ROLE) {
+    ) external payable onlyRole(CompletePools_ROLE) {
         for (uint256 i = 0; i < CompletePools.length; i++) {
             address _token = CompletePools[i].token;
             uint PoolIndex = Pools[_token].length - 1;
@@ -370,7 +386,7 @@ contract L1Pool is
         Pools[_token].push(
             Pool({
                 startTimestamp: uint32(startTimes),
-                endTimestamp: uint32(startTimes + periodTime),
+                endTimestamp:  startTimes + periodTime,
                 token: _token,
                 TotalAmount: 0,
                 TotalFee: 0,
@@ -380,5 +396,23 @@ contract L1Pool is
         );
         SupportTokens.push(_token);
         emit SetSupportTokenEvent(_token, _isSupport);
+    }
+
+
+
+    function getPoolLength(address _token) external view returns (uint256) {
+        return Pools[_token].length;
+    }
+
+    function getUserLength(address _user) external view returns (uint256) {
+        return Users[_user].length;
+    }
+
+    function getPool(address _token, uint256 _index) external view returns (Pool memory) {
+        return Pools[_token][_index];
+    }
+
+    function getUser(address _user, uint256 _index) external view returns (User memory) {
+        return Users[_user][_index];
     }
 }

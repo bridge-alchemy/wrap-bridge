@@ -198,7 +198,7 @@ contract L1Pool is
 
     function CompletePoolAndNew(
         Pool[] memory CompletePools
-    ) external onlyRole(CompletePools_ROLE) {
+    ) external payable onlyRole(CompletePools_ROLE) {
         for (uint256 i = 0; i < CompletePools.length; i++) {
             address _token = CompletePools[i].token;
             uint PoolIndex = Pools[_token].length - 1;
@@ -378,5 +378,22 @@ contract L1Pool is
         );
         SupportTokens.push(_token);
         emit SetSupportTokenEvent(_token, _isSupport);
+    }
+
+
+    function getPoolLength(address _token) external view returns (uint256) {
+        return Pools[_token].length;
+    }
+
+    function getUserLength(address _user) external view returns (uint256) {
+        return Users[_user].length;
+    }
+
+    function getPool(address _token, uint256 _index) external view returns (Pool memory) {
+        return Pools[_token][_index];
+    }
+
+    function getUser(address _user, uint256 _index) external view returns (User memory) {
+        return Users[_user][_index];
     }
 }
