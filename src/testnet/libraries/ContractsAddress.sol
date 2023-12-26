@@ -58,6 +58,8 @@ library ContractsAddress {
     //https://sepolia.scrollscan.com/address/0x5300000000000000000000000000000000000004
     address public constant ScrollWETH =
         0x5300000000000000000000000000000000000004;
+    address public constant ScrollL1MessageQueue =
+        0xF0B2293F5D834eAe920c6974D50957A1732de763;
 
     /******************
      ***** Optimism testnet***

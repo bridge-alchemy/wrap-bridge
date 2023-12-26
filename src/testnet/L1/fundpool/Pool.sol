@@ -14,6 +14,7 @@ import "../../../interfaces/IPolygonZkEVMCustomerBridge.sol";
 import "../../../interfaces/IOptimismCustomerBridge.sol";
 import "../../../interfaces/IArbitrumCustomerBridge.sol";
 import "../../libraries/ContractsAddress.sol";
+import "../../../interfaces/IL1MessageQueue.sol";
 import "forge-std/Test.sol";
 
 contract L1Pool is
@@ -24,10 +25,14 @@ contract L1Pool is
 {
     using SafeERC20 for IERC20;
 
+
+
     address public constant ETHAddress =
         address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     address public constant WETHAddress =
-        address(0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9);
+        address(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f); // mockWETH
+//    address public constant WETHAddress =
+//    address(0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9);
     bytes32 public constant CompletePools_ROLE =
         keccak256(abi.encode(uint256(keccak256("CompletePools_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
@@ -95,6 +100,9 @@ contract L1Pool is
                 msg.value
             );
         }
+        if(Pools[address(ETHAddress)].length == 0){
+            revert NewPoolIsNotCreate(1);
+        }
         uint256 PoolIndex = Pools[address(ETHAddress)].length - 1;
         if (
             Pools[address(ETHAddress)][PoolIndex].startTimestamp >
@@ -111,7 +119,7 @@ contract L1Pool is
             );
             Pools[address(ETHAddress)][PoolIndex].TotalAmount += msg.value;
         } else {
-            revert NewPoolIsNotCreate(PoolIndex);
+            revert NewPoolIsNotCreate(PoolIndex + 1 );
         }
 
         emit StakingETHEvent(msg.sender, msg.value);
@@ -163,7 +171,9 @@ contract L1Pool is
         if (!IsSupportToken[_token]) {
             revert TokenIsNotSupported(_token);
         }
-
+       if (Pools[_token].length == 0) {
+          revert NewPoolIsNotCreate(0);
+        }
         for (uint256 i = 0; i < Users[msg.sender].length; i++) {
             if(Users[msg.sender].length == 0){
                 break;
@@ -172,7 +182,7 @@ contract L1Pool is
                 continue;
             }
             if (Users[msg.sender][i].isClaimed) {
-                revert AlreadyClaimed();
+                continue;
             } //Last Completed PoolIndex
             uint256 EndPoolId = Pools[_token].length - 1;
             Pools[_token][EndPoolId].TotalAmount -= Users[msg.sender][i].Amount;
@@ -184,7 +194,7 @@ contract L1Pool is
                 revert NoReward();
             }
 
-            for (uint256 j = startPoolId; j < EndPoolId; i++) {
+            for (uint256 j = startPoolId; j < EndPoolId; j++) {
                 if (j > Pools[_token].length - 1) {
                     revert NewPoolIsNotCreate(j);
                 }
@@ -209,8 +219,7 @@ contract L1Pool is
             if(Users[msg.sender].length > 1){
                 Users[msg.sender][i] = Users[msg.sender][Users[msg.sender].length - 1];
             }
-            Users[msg.sender].pop();
-            i--;
+
         }
     }
 
@@ -240,23 +249,24 @@ contract L1Pool is
 
     function TransferAssertToBridge(
         uint256 Blockchain,
-        address _token,
+        address token,
         address to,
-        uint256 _amount
+        uint256 amount
     ) external onlyRole(Bridge_ADMIN_ROLE) {
-        //        Bridge _bridge;
+
         if (Blockchain == 534351) {
             //https://chainlist.org/chain/534351
             //Scroll testnet
-            TransferAssertToScrollBridge(_token, to, _amount);
+            uint fee = IL1MessageQueue(ContractsAddress.ScrollL1MessageQueue).estimateCrossDomainMessageFee(30000);
+            TransferAssertToScrollBridge(token, to, amount, fee);
         } else if (Blockchain == 1442) {
-            //https://chainlist.org/chain/1101
-            //Polygon zkEVM testnet
-            TransferAssertToPolygonZkevmBridge(_token, to, _amount);
+//            https://chainlist.org/chain/1442
+//            Polygon zkEVM testnet
+            TransferAssertToPolygonZkEvmBridge(token, to, amount);
         } else if (Blockchain == 11155420) {
             //https://chainlist.org/chain/11155420
             //OP Mainnet testnet
-            TransferAssertToOptimismBridge(_token, to, _amount);
+            TransferAssertToOptimismBridge(token, to, amount);
 //        } else if (Blockchain == 0xa4b1) {
 //            //https://chainlist.org/chain/42161
 //            //Arbitrum
@@ -275,12 +285,13 @@ contract L1Pool is
     function TransferAssertToScrollBridge(
         address _token,
         address to,
-        uint256 _amount
+        uint256 _amount,
+        uint256 fee
     ) internal {
         if (_token == address(ETHAddress)) {
             IScrollCustomerL1ETHBridge(
                 ContractsAddress.ScrollL1CustomerETHBridge
-            ).depositETH{value: _amount}(to, _amount, uint256(gasleft()));
+            ).depositETH{value: _amount + fee}(to, _amount, 30000);
         } else if (_token == address(WETHAddress)) {
             IERC20(_token).approve(
                 ContractsAddress.ScrollL1CustomerWETHBridge,
@@ -300,15 +311,16 @@ contract L1Pool is
         }
     }
 
-    function TransferAssertToPolygonZkevmBridge(
+    function TransferAssertToPolygonZkEvmBridge(
         address _token,
-        address to,
+        address _to,
         uint256 _amount
-    ) internal {
+    ) public {
         if (_token == address(ETHAddress)) {
+
             IPolygonZkEVML1CustomerBridge(
                 ContractsAddress.PolygonL1CustomerBridge
-            ).bridgeAsset{value: _amount}(0x1, to, _amount, _token, false, "");
+            ).bridgeAsset{value: _amount}(0x1, _to, _amount, _token, false, "");
         } else {
             IERC20(_token).approve(
                 ContractsAddress.PolygonL1CustomerBridge,
@@ -316,7 +328,7 @@ contract L1Pool is
             );
             IPolygonZkEVML1CustomerBridge(
                 ContractsAddress.PolygonL1CustomerBridge
-            ).bridgeAsset(0x1, to, _amount, _token, false, "");
+            ).bridgeAsset(0x1, _to, _amount, _token, false, "");
         }
     }
 
@@ -326,8 +338,8 @@ contract L1Pool is
         uint256 _amount
     ) internal {
         if (_token == address(ETHAddress)) {
-            IOptimismL1Bridge(ContractsAddress.OptimismL2CustomerBridge)
-                .depositETHTo{value: _amount}(to, uint32(gasleft()), "");
+            IOptimismL1Bridge(ContractsAddress.OptimismL1CustomerBridge)
+                .depositETHTo{value: _amount,gas:11022052500000}(to, uint32(300000), "");
         } else {
             IERC20(_token).approve(
                 ContractsAddress.OptimismL2CustomerBridge,
@@ -385,6 +397,19 @@ contract L1Pool is
         IsSupportToken[_token] = _isSupport;
         Pools[_token].push(
             Pool({
+                startTimestamp: uint32(startTimes) - periodTime,
+                endTimestamp:  startTimes,
+                token: _token,
+                TotalAmount: 0,
+                TotalFee: 0,
+                TotalFeeClaimed: 0,
+                IsCompleted: false
+            })
+        );
+        //genesis pool
+
+        Pools[_token].push(
+            Pool({
                 startTimestamp: uint32(startTimes),
                 endTimestamp:  startTimes + periodTime,
                 token: _token,
@@ -394,6 +419,7 @@ contract L1Pool is
                 IsCompleted: false
             })
         );
+        //Next pool
         SupportTokens.push(_token);
         emit SetSupportTokenEvent(_token, _isSupport);
     }

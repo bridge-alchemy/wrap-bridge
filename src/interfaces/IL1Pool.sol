@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 
 interface IL1Pool {
-
+//    enum status {Active, Pending, };
     struct Pool {
         uint32 startTimestamp;
         uint32 endTimestamp;
