@@ -34,6 +34,10 @@ contract L1Pool is
     bytes32 public constant Bridge_ADMIN_ROLE =
         keccak256(abi.encode(uint256(keccak256("Bridge_ADMIN_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
+    bytes32 public constant PAUSE_ROLE =
+    keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) &
+            ~bytes32(uint256(0xff));
+
     uint32 public periodTime = 3 * 1 days;
 
     mapping(address => bool) public IsSupportToken;
@@ -316,12 +320,12 @@ contract L1Pool is
         address to,
         uint256 amount
     ) internal {
-        if (_token == address(ETHAddress)) {
+        if (token == address(ETHAddress)) {
             IPolygonZkEVML1CustomerBridge(
                 ContractsAddress.PolygonL1CustomerBridge
             ).bridgeAsset{value: amount}(0x1, to, amount, token, false, "");
         } else {
-            IERC20(_token).approve(
+            IERC20(token).approve(
                 ContractsAddress.PolygonL1CustomerBridge,
                 amount
             );
@@ -426,6 +430,16 @@ contract L1Pool is
         SupportTokens.push(_token);
         emit SetSupportTokenEvent(_token, _isSupport);
     }
+
+    function pause() external onlyRole(PAUSE_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSE_ROLE) {
+        _unpause();
+    }
+
+
 
     function getPoolLength(address _token) external view returns (uint256) {
         return Pools[_token].length;

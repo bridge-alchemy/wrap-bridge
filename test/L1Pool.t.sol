@@ -8,6 +8,7 @@ import "src/interfaces/IL1Pool.sol";
 import "src/Mock/mockWETH.sol";
 import "src/Mock/mockERC20.sol";
 
+
 contract L1fundpoolTest is Test {
 
     address admin;
@@ -69,7 +70,7 @@ contract L1fundpoolTest is Test {
     }
 
 
-    function test_DepositETH() public {
+    function test_StakingETH() public {
 
         L1Pool(address(proxy)).StakingETH{value: 1 ether}();
         assert(L1Pool(address(proxy)).getUserLength(address(this)) == 1);
@@ -82,7 +83,7 @@ contract L1fundpoolTest is Test {
 
     }
 
-    function test_DepositWETH() public {
+    function test_StakingWETH() public {
         WETH.deposit{value: 1 ether}();
         WETH.approve(address(proxy), 1 ether);
         L1Pool(address(proxy)).StakingWETH(1 ether);
@@ -96,7 +97,7 @@ contract L1fundpoolTest is Test {
         assert(_user.isClaimed == false);
     }
 
-    function test_DepositUSDT() public {
+    function test_StakingUSDT() public {
 
         USDT.approve(address(proxy), 100000);
         L1Pool(address(proxy)).StarkingERC20(address(USDT), 100000);

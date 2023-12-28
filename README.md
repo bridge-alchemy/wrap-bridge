@@ -24,8 +24,15 @@ $ forge build
 ### Test
 
 ```shell
-$ source .env
-$ forge test
+source .env
+
+#  L1Pool.t.sol
+
+forge test --match-test test_ClaimUSDT -vvv --fork-url sepolia
+
+#  L1Pool.t.sol
+
+forge test --match-test test_DepositUSDT -vvv --fork-url op
 ```
 
 ### Format

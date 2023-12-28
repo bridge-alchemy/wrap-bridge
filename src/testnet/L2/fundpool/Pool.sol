@@ -23,13 +23,13 @@ contract L2Pool is
     using SafeERC20 for IERC20;
     mapping(uint256 => bool) private IsSupportedChainId;
     mapping(address => bool) private IsSupportedStableCoin;
-    uint256 public MINDepositAmount = 1e16;
-    uint256 public perfee = 1_000; // 0.1%
+    uint256 public MINDepositAmount;
+    uint256 public perfee;
     uint256 public Total_ETH_value;
     uint256 public Total_ETH_fee;
     uint256 public Total_ETH_StableCoin;
     uint256 public Total_ETH_StableCoin_fee;
-    uint32 public constant MAX_GAS_Limit = 100_000; // 0.1%
+    uint32 public  MAX_GAS_Limit;
 
     bytes32 public constant PAUSE_ROLE =
         keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) &
@@ -45,14 +45,15 @@ contract L2Pool is
         _disableInitializers();
     }
 
-    fallback() external payable {}
 
-    receive() external payable {}
 
     function initialize(address _MultisigWallet) public initializer {
         __AccessControl_init();
         __Pausable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
+        MINDepositAmount =   1e16;
+        perfee = 1_000; // 0.1%
+        MAX_GAS_Limit = 100_000;
     }
 
     function depositETH(
@@ -153,12 +154,12 @@ contract L2Pool is
         return true;
     }
 
-    function WithdrawStableCoinToOfficialBridge(
-        address to
-    ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
-        //TODO
-        return true;
-    }
+//    function WithdrawStableCoinToOfficialBridge(
+//        address to
+//    ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
+//        //TODO
+//        return true;
+//    }
 
     function IsSupportChainId(uint256 chainId) public view returns (bool) {
         return IsSupportedChainId[chainId];
@@ -178,7 +179,7 @@ contract L2Pool is
         uint256 Blockchain = block.chainid;
         uint256 balance = address(this).balance;
 
-        if (Blockchain == 0x82750) {
+        if (Blockchain == 534351) {
             //https://chainlist.org/chain/534352
             //Scroll
             IScrollCustomerL2Bridge(ContractsAddress.ScrollL2CustomerBridge)
@@ -187,7 +188,7 @@ contract L2Pool is
                 balance,
                 uint256(MAX_GAS_Limit)
             );
-        } else if (Blockchain == 0x44d) {
+        } else if (Blockchain == 1442) {
             //https://chainlist.org/chain/1101
             //Polygon zkEVM
             IPolygonZkEVML2CustomerBridge(
@@ -200,7 +201,7 @@ contract L2Pool is
                 false,
                 ""
             );
-        } else if (Blockchain == 0xa) {
+        } else if (Blockchain == 11155420) {
             //https://chainlist.org/chain/10
             //OP Mainnet
             IOptimismL2CustomerBridge(ContractsAddress.OptimismL2CustomerBridge)
@@ -211,14 +212,14 @@ contract L2Pool is
                 MAX_GAS_Limit,
                 ""
             );
-        } else if (Blockchain == 0xa4b1) {
-            //https://chainlist.org/chain/42161
-            //Arbitrum
-            //TODO
-        } else if (Blockchain == 0xe708) {
-            //https://chainlist.org/chain/59144
-            //Linea
-            //TODO
+//        } else if (Blockchain == 0xa4b1) {
+//            //https://chainlist.org/chain/42161
+//            //Arbitrum
+//            //TODO
+//        } else if (Blockchain == 0xe708) {
+//            //https://chainlist.org/chain/59144
+//            //Linea
+//            //TODO
         } else {
             revert ErrorBlockChain();
         }

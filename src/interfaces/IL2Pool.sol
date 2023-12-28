@@ -62,7 +62,7 @@ interface IL2Pool {
         uint256 value
     ) external returns (bool);
 
-    function WithdrawStableCoinToOfficialBridge(
-        address to
-    ) external payable returns (bool);
+//    function WithdrawStableCoinToOfficialBridge(
+//        address to
+//    ) external payable returns (bool);
 }
