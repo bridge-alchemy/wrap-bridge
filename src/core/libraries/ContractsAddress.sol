@@ -58,6 +58,8 @@ library ContractsAddress {
     //https://scrollscan.com/token/0x5300000000000000000000000000000000000004
     address public constant ScrollWETH =
         0x5300000000000000000000000000000000000004;
+    address public constant ScrollL1MessageQueue =
+        0x0d7E906BD9cAFa154b048cFa766Cc1E54E39AF9B;
 
     /******************
      ***** Optimism ***

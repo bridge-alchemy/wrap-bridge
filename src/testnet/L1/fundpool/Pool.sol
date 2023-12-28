@@ -25,14 +25,12 @@ contract L1Pool is
 {
     using SafeERC20 for IERC20;
 
-
-
     address public constant ETHAddress =
         address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE);
     address public constant WETHAddress =
         address(0x5615dEB798BB3E4dFa0139dFa1b3D433Cc23b72f); // mockWETH
-//    address public constant WETHAddress =
-//    address(0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9);
+    //    address public constant WETHAddress =
+    //    address(0x7b79995e5f793A07Bc00c21412e50Ecae098E7f9);
     bytes32 public constant CompletePools_ROLE =
         keccak256(abi.encode(uint256(keccak256("CompletePools_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
@@ -48,7 +46,6 @@ contract L1Pool is
     address[] public SupportTokens;
 
     constructor() {
-
         _disableInitializers();
     }
 
@@ -57,9 +54,11 @@ contract L1Pool is
         __Pausable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
         periodTime = 3 days;
-
-
     }
+
+    /*************************
+     ***** User function *****
+     *************************/
 
     function StarkingERC20(
         address _token,
@@ -85,10 +84,9 @@ contract L1Pool is
                 })
             );
             Pools[_token][PoolIndex].TotalAmount += _amount;
-        }else {
+        } else {
             revert NewPoolIsNotCreate(PoolIndex);
         }
-
 
         emit StarkingERC20Event(msg.sender, _token, _amount);
     }
@@ -100,7 +98,7 @@ contract L1Pool is
                 msg.value
             );
         }
-        if(Pools[address(ETHAddress)].length == 0){
+        if (Pools[address(ETHAddress)].length == 0) {
             revert NewPoolIsNotCreate(1);
         }
         uint256 PoolIndex = Pools[address(ETHAddress)].length - 1;
@@ -119,7 +117,7 @@ contract L1Pool is
             );
             Pools[address(ETHAddress)][PoolIndex].TotalAmount += msg.value;
         } else {
-            revert NewPoolIsNotCreate(PoolIndex + 1 );
+            revert NewPoolIsNotCreate(PoolIndex + 1);
         }
 
         emit StakingETHEvent(msg.sender, msg.value);
@@ -152,7 +150,7 @@ contract L1Pool is
                 })
             );
             Pools[address(WETHAddress)][PoolIndex].TotalAmount += amount;
-        }else {
+        } else {
             revert NewPoolIsNotCreate(PoolIndex);
         }
 
@@ -171,11 +169,11 @@ contract L1Pool is
         if (!IsSupportToken[_token]) {
             revert TokenIsNotSupported(_token);
         }
-       if (Pools[_token].length == 0) {
-          revert NewPoolIsNotCreate(0);
+        if (Pools[_token].length == 0) {
+            revert NewPoolIsNotCreate(0);
         }
         for (uint256 i = 0; i < Users[msg.sender].length; i++) {
-            if(Users[msg.sender].length == 0){
+            if (Users[msg.sender].length == 0) {
                 break;
             }
             if (Users[msg.sender][i].token != _token) {
@@ -216,12 +214,17 @@ contract L1Pool is
             }
 
             emit ClaimEvent(msg.sender, startPoolId, EndPoolId, _token, Amount);
-            if(Users[msg.sender].length > 1){
-                Users[msg.sender][i] = Users[msg.sender][Users[msg.sender].length - 1];
+            if (Users[msg.sender].length > 1) {
+                Users[msg.sender][i] = Users[msg.sender][
+                    Users[msg.sender].length - 1
+                ];
             }
-
         }
     }
+
+    /***************************************
+     ***** CompletePools_ROLE function *****
+     ***************************************/
 
     function CompletePoolAndNew(
         Pool[] memory CompletePools
@@ -253,30 +256,30 @@ contract L1Pool is
         address to,
         uint256 amount
     ) external onlyRole(Bridge_ADMIN_ROLE) {
-
         if (Blockchain == 534351) {
             //https://chainlist.org/chain/534351
             //Scroll testnet
-            uint fee = IL1MessageQueue(ContractsAddress.ScrollL1MessageQueue).estimateCrossDomainMessageFee(30000);
+            uint fee = IL1MessageQueue(ContractsAddress.ScrollL1MessageQueue)
+                .estimateCrossDomainMessageFee(30000);
             TransferAssertToScrollBridge(token, to, amount, fee);
         } else if (Blockchain == 1442) {
-//            https://chainlist.org/chain/1442
-//            Polygon zkEVM testnet
+            //            https://chainlist.org/chain/1442
+            //            Polygon zkEVM testnet
             TransferAssertToPolygonZkEvmBridge(token, to, amount);
         } else if (Blockchain == 11155420) {
             //https://chainlist.org/chain/11155420
             //OP Mainnet testnet
             TransferAssertToOptimismBridge(token, to, amount);
-//        } else if (Blockchain == 0xa4b1) {
-//            //https://chainlist.org/chain/42161
-//            //Arbitrum
-//            //Todo
-//            //            TransferAssertToArbitrumBridge(_token, to, _amount);
-//        } else if (Blockchain == 0xe708) {
-//            //https://chainlist.org/chain/59144
-//            //Linea
-//            //Todo
-//            //            TransferAssertToLineaBridge(_token, to, _amount);
+            //        } else if (Blockchain == 0xa4b1) {
+            //            //https://chainlist.org/chain/42161
+            //            //Arbitrum
+            //            //Todo
+            //            //            TransferAssertToArbitrumBridge(_token, to, _amount);
+            //        } else if (Blockchain == 0xe708) {
+            //            //https://chainlist.org/chain/59144
+            //            //Linea
+            //            //Todo
+            //            //            TransferAssertToLineaBridge(_token, to, _amount);
         } else {
             revert ErrorBlockChain();
         }
@@ -315,9 +318,8 @@ contract L1Pool is
         address _token,
         address _to,
         uint256 _amount
-    ) public {
+    ) internal {
         if (_token == address(ETHAddress)) {
-
             IPolygonZkEVML1CustomerBridge(
                 ContractsAddress.PolygonL1CustomerBridge
             ).bridgeAsset{value: _amount}(0x1, _to, _amount, _token, false, "");
@@ -339,7 +341,11 @@ contract L1Pool is
     ) internal {
         if (_token == address(ETHAddress)) {
             IOptimismL1Bridge(ContractsAddress.OptimismL1CustomerBridge)
-                .depositETHTo{value: _amount,gas:11022052500000}(to, uint32(300000), "");
+                .depositETHTo{value: _amount, gas: 11022052500000}(
+                to,
+                uint32(300000),
+                ""
+            );
         } else {
             IERC20(_token).approve(
                 ContractsAddress.OptimismL2CustomerBridge,
@@ -375,6 +381,10 @@ contract L1Pool is
         // Todo
     }
 
+    /***************************************
+     ***** Admin function *****
+     ***************************************/
+
     function setMinStakeAmount(
         address _token,
         uint256 _amount
@@ -398,7 +408,7 @@ contract L1Pool is
         Pools[_token].push(
             Pool({
                 startTimestamp: uint32(startTimes) - periodTime,
-                endTimestamp:  startTimes,
+                endTimestamp: startTimes,
                 token: _token,
                 TotalAmount: 0,
                 TotalFee: 0,
@@ -411,7 +421,7 @@ contract L1Pool is
         Pools[_token].push(
             Pool({
                 startTimestamp: uint32(startTimes),
-                endTimestamp:  startTimes + periodTime,
+                endTimestamp: startTimes + periodTime,
                 token: _token,
                 TotalAmount: 0,
                 TotalFee: 0,
@@ -424,8 +434,6 @@ contract L1Pool is
         emit SetSupportTokenEvent(_token, _isSupport);
     }
 
-
-
     function getPoolLength(address _token) external view returns (uint256) {
         return Pools[_token].length;
     }
@@ -434,11 +442,17 @@ contract L1Pool is
         return Users[_user].length;
     }
 
-    function getPool(address _token, uint256 _index) external view returns (Pool memory) {
+    function getPool(
+        address _token,
+        uint256 _index
+    ) external view returns (Pool memory) {
         return Pools[_token][_index];
     }
 
-    function getUser(address _user, uint256 _index) external view returns (User memory) {
+    function getUser(
+        address _user,
+        uint256 _index
+    ) external view returns (User memory) {
         return Users[_user][_index];
     }
 }

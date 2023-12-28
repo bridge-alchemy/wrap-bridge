@@ -16,7 +16,6 @@ interface IScrollCustomerL1ETHBridge {
         uint256 _amount,
         uint256 _gasLimit
     ) external payable;
-
 }
 
 interface IScrollCustomerL1WETHBridge {
@@ -26,7 +25,6 @@ interface IScrollCustomerL1WETHBridge {
         uint256 _amount,
         uint256 _gasLimit
     ) external payable;
-
 }
 
 interface IScrollCustomerL1ERC20Bridge {
@@ -36,5 +34,4 @@ interface IScrollCustomerL1ERC20Bridge {
         uint256 _amount,
         uint256 _gasLimit
     ) external payable;
-
 }

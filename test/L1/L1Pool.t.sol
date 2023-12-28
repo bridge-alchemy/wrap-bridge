@@ -59,6 +59,13 @@ contract L1fundpoolTest is Test {
         L1Pool(address(proxy)).SetSupportToken(address(USDT), true, startTimes);
         vm.stopPrank();
 
+
+
+        vm.startPrank(CompletePools_ROLE);
+        WETH.deposit{value: 10 ether}();
+        USDT.mint(CompletePools_ROLE, 100000000);
+        vm.stopPrank();
+
     }
 
 
@@ -90,7 +97,7 @@ contract L1fundpoolTest is Test {
     }
 
     function test_DepositUSDT() public {
-        USDT.mint(address(this), 100000);
+
         USDT.approve(address(proxy), 100000);
         L1Pool(address(proxy)).StarkingERC20(address(USDT), 100000);
 
@@ -104,12 +111,12 @@ contract L1fundpoolTest is Test {
     }
 
 
-    function test_ClaimAsset() public {
+    function test_ClaimETH() public {
         uint balanceBefore = address(this).balance;
         L1Pool(address(proxy)).StakingETH{value: 1 ether}();
-        CompletePoolAndNew(address(ETHAddress), 0);
+        CompleteETHPoolAndNew(address(ETHAddress), 0);
 
-        CompletePoolAndNew(address(ETHAddress), 0.1 ether);
+        CompleteETHPoolAndNew(address(ETHAddress), 0.1 ether);
         L1Pool(address(proxy)).ClaimSimpleAsset(ETHAddress);
         uint balanceAfter = address(this).balance;
 
@@ -118,16 +125,16 @@ contract L1fundpoolTest is Test {
 
     }
 
-    function test_ClaimAsset_Staking_twice() public {
+    function test_ClaimETH_Staking_twice() public {
 
         uint balanceBefore = address(this).balance;
         L1Pool(address(proxy)).StakingETH{value: 1 ether}();
 
 
-        CompletePoolAndNew(address(ETHAddress), 0);
+        CompleteETHPoolAndNew(address(ETHAddress), 0);
         L1Pool(address(proxy)).StakingETH{value: 1 ether}();
-        CompletePoolAndNew(address(ETHAddress), 0.1 ether);
-        CompletePoolAndNew(address(ETHAddress), 0.2 ether);
+        CompleteETHPoolAndNew(address(ETHAddress), 0.1 ether);
+        CompleteETHPoolAndNew(address(ETHAddress), 0.2 ether);
         L1Pool(address(proxy)).ClaimSimpleAsset(ETHAddress);
 
 
@@ -138,14 +145,79 @@ contract L1fundpoolTest is Test {
 
     }
 
-    function CompletePoolAndNew(address _token, uint totalFee) public {
+    function test_ClaimWETH() public{
+        WETH.deposit{value: 1 ether}();
+        uint balanceBefore = WETH.balanceOf(address(this));
+        WETH.approve(address(proxy), 0.1 ether);
+        L1Pool(address(proxy)).StakingWETH(0.1 ether);
+        CompleteWETHPoolAndNew(address(WETH), 0);
+
+        CompleteWETHPoolAndNew(address(WETH), 0.1 ether);
+        
+        L1Pool(address(proxy)).ClaimSimpleAsset(address(WETH));
+        uint balanceAfter =  WETH.balanceOf(address(this));
+
+        console.log("balanceBefore", balanceBefore);
+        console.log("balanceAfter", balanceAfter);
+
+    }
+
+
+    function test_ClaimUSDT() public{
+
+        uint balanceBefore = USDT.balanceOf(address(this));
+        USDT.approve(address(proxy), 10000);
+        L1Pool(address(proxy)).StarkingERC20(address(USDT), 10000);
+        CompleteUSDTPoolAndNew(address(USDT), 0);
+
+        CompleteUSDTPoolAndNew(address(USDT), 100);
+
+        L1Pool(address(proxy)).ClaimSimpleAsset(address(USDT));
+        uint balanceAfter =  USDT.balanceOf(address(this));
+
+        console.log("balanceBefore", balanceBefore);
+        console.log("balanceAfter", balanceAfter);
+
+    }
+
+
+    function CompleteETHPoolAndNew(address _token, uint totalFee) internal {
         uint latest  = L1Pool(address(proxy)).getPoolLength(_token) - 2;
         vm.warp(L1Pool(address(proxy)).getPool(ETHAddress, latest).endTimestamp);
         vm.startPrank(CompletePools_ROLE);
 
-        IL1Pool.Pool[] memory CompletePools_periodTwo = new IL1Pool.Pool[](1);
-        CompletePools_periodTwo[0] = IL1Pool.Pool(0, 0, address(ETHAddress), 0, totalFee, 0, false);
-        L1Pool(address(proxy)).CompletePoolAndNew{value: totalFee}(CompletePools_periodTwo);
+        IL1Pool.Pool[] memory CompletePools_period = new IL1Pool.Pool[](1);
+        CompletePools_period[0] = IL1Pool.Pool(0, 0, address(ETHAddress), 0, totalFee, 0, false);
+        L1Pool(address(proxy)).CompletePoolAndNew{value: totalFee}(CompletePools_period);
+        vm.stopPrank();
+
+    }
+
+    function CompleteWETHPoolAndNew(address _token, uint totalFee) internal {
+        uint latest  = L1Pool(address(proxy)).getPoolLength(_token) - 2;
+        vm.warp(L1Pool(address(proxy)).getPool(address(WETH), latest).endTimestamp);
+        vm.startPrank(CompletePools_ROLE);
+
+        IL1Pool.Pool[] memory CompletePools_period = new IL1Pool.Pool[](1);
+        CompletePools_period[0] = IL1Pool.Pool(0, 0, address(WETH), 0, totalFee, 0, false);
+        L1Pool(address(proxy)).CompletePoolAndNew(CompletePools_period);
+        WETH.transfer(address(proxy), totalFee);
+
+        vm.stopPrank();
+
+    }
+
+
+    function CompleteUSDTPoolAndNew(address _token, uint totalFee) internal {
+        uint latest  = L1Pool(address(proxy)).getPoolLength(_token) - 2;
+        vm.warp(L1Pool(address(proxy)).getPool(address(USDT), latest).endTimestamp);
+        vm.startPrank(CompletePools_ROLE);
+
+        IL1Pool.Pool[] memory CompletePools_period = new IL1Pool.Pool[](1);
+        CompletePools_period[0] = IL1Pool.Pool(0, 0, address(USDT), 0, totalFee, 0, false);
+        L1Pool(address(proxy)).CompletePoolAndNew(CompletePools_period);
+        USDT.transfer(address(proxy), totalFee);
+
         vm.stopPrank();
 
     }
@@ -169,4 +241,5 @@ contract L1fundpoolTest is Test {
     }
 
 
-    }
+
+}

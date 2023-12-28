@@ -28,5 +28,4 @@ interface IOptimismL1Bridge {
         uint32 _minGasLimit,
         bytes calldata _extraData
     ) external;
-
 }

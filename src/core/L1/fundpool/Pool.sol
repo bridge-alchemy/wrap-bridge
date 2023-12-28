@@ -14,6 +14,7 @@ import "../../../interfaces/IPolygonZkEVMCustomerBridge.sol";
 import "../../../interfaces/IOptimismCustomerBridge.sol";
 import "../../../interfaces/IArbitrumCustomerBridge.sol";
 import "../../libraries/ContractsAddress.sol";
+import "../../../interfaces/IL1MessageQueue.sol";
 
 contract L1Pool is
     IL1Pool,
@@ -43,7 +44,6 @@ contract L1Pool is
     address[] public SupportTokens;
 
     constructor() {
-
         _disableInitializers();
     }
 
@@ -51,9 +51,12 @@ contract L1Pool is
         __AccessControl_init();
         __Pausable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _MultisigWallet);
-
-
+        periodTime = 3 days;
     }
+
+    /*************************
+     ***** User function *****
+     *************************/
 
     function StarkingERC20(
         address _token,
@@ -79,6 +82,8 @@ contract L1Pool is
                 })
             );
             Pools[_token][PoolIndex].TotalAmount += _amount;
+        } else {
+            revert NewPoolIsNotCreate(PoolIndex);
         }
 
         emit StarkingERC20Event(msg.sender, _token, _amount);
@@ -92,6 +97,9 @@ contract L1Pool is
             );
         }
         uint256 PoolIndex = Pools[address(ETHAddress)].length - 1;
+        if (Pools[address(ETHAddress)].length == 0) {
+            revert NewPoolIsNotCreate(1);
+        }
         if (
             Pools[address(ETHAddress)][PoolIndex].startTimestamp >
             block.timestamp
@@ -107,7 +115,7 @@ contract L1Pool is
             );
             Pools[address(ETHAddress)][PoolIndex].TotalAmount += msg.value;
         } else {
-            revert NewPoolIsNotCreate(PoolIndex);
+            revert NewPoolIsNotCreate(PoolIndex + 1);
         }
 
         emit StakingETHEvent(msg.sender, msg.value);
@@ -157,31 +165,42 @@ contract L1Pool is
         if (!IsSupportToken[_token]) {
             revert TokenIsNotSupported(_token);
         }
-        uint256 length = Users[msg.sender].length;
-        for (uint256 i = 0; i < length; i++) {
+        if (Pools[_token].length == 0) {
+            revert NewPoolIsNotCreate(0);
+        }
+        for (uint256 i = 0; i < Users[msg.sender].length; i++) {
+            if (Users[msg.sender].length == 0) {
+                break;
+            }
             if (Users[msg.sender][i].token != _token) {
                 continue;
             }
             if (Users[msg.sender][i].isClaimed) {
-                revert AlreadyClaimed();
+                continue;
             } //Last Completed PoolIndex
-            uint256 EndPoolId = Pools[_token].length - 2;
-            if (!Pools[_token][EndPoolId].IsCompleted) {
-                EndPoolId -= 1;
-            }
-            Pools[_token][EndPoolId+1].TotalAmount -= Users[msg.sender][i].Amount;
+            uint256 EndPoolId = Pools[_token].length - 1;
+            Pools[_token][EndPoolId].TotalAmount -= Users[msg.sender][i].Amount;
 
             uint256 Reward = 0;
             uint256 Amount = Users[msg.sender][i].Amount;
             uint256 startPoolId = Users[msg.sender][i].StartPoolId;
-            for (uint256 j = startPoolId; j <= EndPoolId; i++) {
+            if (startPoolId > EndPoolId) {
+                revert NoReward();
+            }
+
+            for (uint256 j = startPoolId; j < EndPoolId; j++) {
+                if (j > Pools[_token].length - 1) {
+                    revert NewPoolIsNotCreate(j);
+                }
                 uint256 _Reward = (Amount * Pools[_token][j].TotalFee) /
                     Pools[_token][j].TotalAmount;
                 Reward += _Reward;
                 Pools[_token][j].TotalFeeClaimed += _Reward;
             }
+            require(Reward > 0, "No Reward");
             Amount += Reward;
             Users[msg.sender][i].isClaimed = true;
+
             if (_token == address(ETHAddress)) {
                 payable(msg.sender).transfer(Amount);
             } else if (_token == address(WETHAddress)) {
@@ -189,12 +208,19 @@ contract L1Pool is
             } else {
                 IERC20(_token).safeTransfer(msg.sender, Amount);
             }
+
             emit ClaimEvent(msg.sender, startPoolId, EndPoolId, _token, Amount);
-            Users[msg.sender][i] = Users[msg.sender][length - 1];
-            Users[msg.sender].pop();
-            i--;
+            if (Users[msg.sender].length > 1) {
+                Users[msg.sender][i] = Users[msg.sender][
+                    Users[msg.sender].length - 1
+                ];
+            }
         }
     }
+
+    /***************************************
+     ***** CompletePools_ROLE function *****
+     ***************************************/
 
     function CompletePoolAndNew(
         Pool[] memory CompletePools
@@ -222,23 +248,25 @@ contract L1Pool is
 
     function TransferAssertToBridge(
         uint256 Blockchain,
-        address _token,
+        address token,
         address to,
-        uint256 _amount
+        uint256 amount
     ) external onlyRole(Bridge_ADMIN_ROLE) {
         //        Bridge _bridge;
         if (Blockchain == 0x82750) {
             //https://chainlist.org/chain/534352
             //Scroll
-            TransferAssertToScrollBridge(_token, to, _amount);
+            uint fee = IL1MessageQueue(ContractsAddress.ScrollL1MessageQueue)
+                .estimateCrossDomainMessageFee(30000);
+            TransferAssertToScrollBridge(token, to, amount, fee);
         } else if (Blockchain == 0x44d) {
             //https://chainlist.org/chain/1101
             //Polygon zkEVM
-            TransferAssertToPolygonZkevmBridge(_token, to, _amount);
+            TransferAssertToPolygonZkevmBridge(token, to, amount);
         } else if (Blockchain == 0xa) {
             //https://chainlist.org/chain/10
             //OP Mainnet
-            TransferAssertToOptimismBridge(_token, to, _amount);
+            TransferAssertToOptimismBridge(token, to, amount);
         } else if (Blockchain == 0xa4b1) {
             //https://chainlist.org/chain/42161
             //Arbitrum
@@ -257,12 +285,13 @@ contract L1Pool is
     function TransferAssertToScrollBridge(
         address _token,
         address to,
-        uint256 _amount
+        uint256 _amount,
+        uint fee
     ) internal {
         if (_token == address(ETHAddress)) {
             IScrollCustomerL1ETHBridge(
                 ContractsAddress.ScrollL1CustomerETHBridge
-            ).depositETH{value: _amount}(to, _amount, uint256(gasleft()));
+            ).depositETH{value: _amount + fee}(to, _amount, uint256(gasleft()));
         } else if (_token == address(WETHAddress)) {
             IERC20(_token).approve(
                 ContractsAddress.ScrollL1CustomerWETHBridge,
@@ -283,44 +312,48 @@ contract L1Pool is
     }
 
     function TransferAssertToPolygonZkevmBridge(
-        address _token,
+        address token,
         address to,
-        uint256 _amount
+        uint256 amount
     ) internal {
         if (_token == address(ETHAddress)) {
             IPolygonZkEVML1CustomerBridge(
                 ContractsAddress.PolygonL1CustomerBridge
-            ).bridgeAsset{value: _amount}(0x1, to, _amount, _token, false, "");
+            ).bridgeAsset{value: amount}(0x1, to, amount, token, false, "");
         } else {
             IERC20(_token).approve(
                 ContractsAddress.PolygonL1CustomerBridge,
-                _amount
+                amount
             );
             IPolygonZkEVML1CustomerBridge(
                 ContractsAddress.PolygonL1CustomerBridge
-            ).bridgeAsset(0x1, to, _amount, _token, false, "");
+            ).bridgeAsset(0x1, to, amount, token, false, "");
         }
     }
 
     function TransferAssertToOptimismBridge(
-        address _token,
+        address token,
         address to,
-        uint256 _amount
+        uint256 amount
     ) internal {
-        if (_token == address(ETHAddress)) {
+        if (token == address(ETHAddress)) {
             IOptimismL1Bridge(ContractsAddress.OptimismL2CustomerBridge)
-                .depositETHTo{value: _amount}(to, uint32(gasleft()), "");
+                .depositETHTo{value: amount, gas: 11022052500000}(
+                to,
+                uint32(gasleft()),
+                ""
+            );
         } else {
-            IERC20(_token).approve(
+            IERC20(token).approve(
                 ContractsAddress.OptimismL2CustomerBridge,
-                _amount
+                amount
             );
             IOptimismL1Bridge(ContractsAddress.OptimismL2CustomerBridge)
                 .depositERC20To(
-                    _token,
-                    _token,
+                    token,
+                    token,
                     to,
-                    _amount,
+                    amount,
                     uint32(gasleft()),
                     ""
                 );
@@ -367,8 +400,8 @@ contract L1Pool is
         IsSupportToken[_token] = _isSupport;
         Pools[_token].push(
             Pool({
-                startTimestamp: uint32(startTimes),
-                endTimestamp: uint32(startTimes + periodTime),
+                startTimestamp: uint32(startTimes) - periodTime,
+                endTimestamp: startTimes,
                 token: _token,
                 TotalAmount: 0,
                 TotalFee: 0,
@@ -376,10 +409,23 @@ contract L1Pool is
                 IsCompleted: false
             })
         );
+        //genesis pool
+
+        Pools[_token].push(
+            Pool({
+                startTimestamp: uint32(startTimes),
+                endTimestamp: startTimes + periodTime,
+                token: _token,
+                TotalAmount: 0,
+                TotalFee: 0,
+                TotalFeeClaimed: 0,
+                IsCompleted: false
+            })
+        );
+        //Next pool
         SupportTokens.push(_token);
         emit SetSupportTokenEvent(_token, _isSupport);
     }
-
 
     function getPoolLength(address _token) external view returns (uint256) {
         return Pools[_token].length;
@@ -389,11 +435,17 @@ contract L1Pool is
         return Users[_user].length;
     }
 
-    function getPool(address _token, uint256 _index) external view returns (Pool memory) {
+    function getPool(
+        address _token,
+        uint256 _index
+    ) external view returns (Pool memory) {
         return Pools[_token][_index];
     }
 
-    function getUser(address _user, uint256 _index) external view returns (User memory) {
+    function getUser(
+        address _user,
+        uint256 _index
+    ) external view returns (User memory) {
         return Users[_user][_index];
     }
 }

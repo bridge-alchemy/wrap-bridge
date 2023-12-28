@@ -4,8 +4,7 @@ pragma solidity 0.8.22;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract Proxy is TransparentUpgradeableProxy {
-
-//    fallback() external override payable {}
+    //    fallback() external override payable {}
 
     receive() external payable {}
 
