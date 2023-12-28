@@ -30,45 +30,14 @@ source .env
 
 forge test --match-test test_ClaimUSDT -vvv --fork-url sepolia
 
-#  L1Pool.t.sol
+#  L2Pool.t.sol
 
-forge test --match-test test_DepositUSDT -vvv --fork-url op
-```
+forge test --match-test test_WithdrawETHtoOPBridge -vvv --fork-url op
+forge test --match-test test_WithdrawETHtoScrollBridge -vvv --fork-url scroll
 
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
 ```
 
 ### Deploy
 
 ```shell
-$ forge script script/deployer.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+script ./script/L2Pool.s.sol --rpc-url scroll --broadcast --private-key $Private-key --verify  -vvvvv --etherscan-api-key $api-key --verifier-url https://blockscout.scroll.io/api/ --verifier blockscout

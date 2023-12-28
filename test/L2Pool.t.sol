@@ -42,11 +42,12 @@ contract L1fundpoolTest is Test {
         l2Pool = new L2Pool();
         proxyTimeLockController = new ProxyTimeLockController(minDelay, proposers, executors, admin);
         bytes memory _data = abi.encodeWithSignature("initialize(address)", address(admin));
+
         proxy = new Proxy(address(l2Pool), address(proxyTimeLockController), _data);
         vm.startPrank(admin);
 
         L2Pool(address(proxy)).grantRole(l2Pool.WithdrawToBridge_Role(), WithdrawToBridge_Role);
-
+        console.logBytes32(l2Pool.WithdrawToBridge_Role());
         L2Pool(address(proxy)).setValidChainId(11155111, true); // sepolia
         L2Pool(address(proxy)).setValidChainId(534351, true); // Scroll Sepolia
         L2Pool(address(proxy)).setValidChainId(11155420, true); // OP Sepolia

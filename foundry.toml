@@ -13,3 +13,7 @@ polygon = "https://rpc.ankr.com/polygon_zkevm_testnet/${ANKR_KEY}"
 op = "https://rpc.ankr.com/optimism_sepolia/${ANKR_KEY}"
 
 #  op-sepolia -> sepolia -> scroll
+
+
+#[etherscan]
+#scroll = { key = "${ETHERSCAN_API_KEY}" }

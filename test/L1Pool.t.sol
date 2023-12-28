@@ -44,6 +44,7 @@ contract L1fundpoolTest is Test {
         l1Pool = new L1Pool();
         proxyTimeLockController = new ProxyTimeLockController(minDelay, proposers, executors, admin);
         bytes memory _data = abi.encodeWithSignature("initialize(address)", address(admin));
+
         proxy = new Proxy(address(l1Pool), address(proxyTimeLockController), _data);
         vm.startPrank(admin);
 
