@@ -35,7 +35,7 @@ contract L1Pool is
         keccak256(abi.encode(uint256(keccak256("Bridge_ADMIN_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
     bytes32 public constant PAUSE_ROLE =
-    keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) &
+        keccak256(abi.encode(uint256(keccak256("PAUSE_ROLE")) - 1)) &
             ~bytes32(uint256(0xff));
 
     uint32 public periodTime = 3 * 1 days;
@@ -438,8 +438,6 @@ contract L1Pool is
     function unpause() external onlyRole(PAUSE_ROLE) {
         _unpause();
     }
-
-
 
     function getPoolLength(address _token) external view returns (uint256) {
         return Pools[_token].length;

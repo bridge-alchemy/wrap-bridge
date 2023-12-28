@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.so
 
 contract Proxy is TransparentUpgradeableProxy {
     receive() external payable {}
+
     constructor(
         address BridgeLogic,
         address admin_,

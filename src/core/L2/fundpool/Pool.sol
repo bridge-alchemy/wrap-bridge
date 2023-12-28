@@ -45,7 +45,6 @@ contract L2Pool is
         _disableInitializers();
     }
 
-
     receive() external payable {}
 
     function initialize(address _MultisigWallet) public initializer {
@@ -152,12 +151,12 @@ contract L2Pool is
         return true;
     }
 
-//    function WithdrawStableCoinToOfficialBridge(
-//        address to
-//    ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
-//        //TODO
-//        return true;
-//    }
+    //    function WithdrawStableCoinToOfficialBridge(
+    //        address to
+    //    ) external payable onlyRole(WithdrawToBridge_Role) returns (bool) {
+    //        //TODO
+    //        return true;
+    //    }
 
     function IsSupportChainId(uint256 chainId) public view returns (bool) {
         return IsSupportedChainId[chainId];
