@@ -16,4 +16,5 @@ docs/
 lib/
 node_modules/
 
-broadcast/
+
+/broadcast/
