@@ -4,6 +4,8 @@ pragma solidity 0.8.22;
 import "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract Proxy is TransparentUpgradeableProxy {
+    receive() external payable {}
+
     constructor(
         address BridgeLogic,
         address admin_,
